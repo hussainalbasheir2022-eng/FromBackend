@@ -1,0 +1,156 @@
+version: '3.9'
+
+services:
+
+  # ─── SQL Server ────────────────────────────────────────────────────────────
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: flutter-platform-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "YourStrong@Passw0rd"
+      MSSQL_PID: "Express"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - flutter-platform
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ─── Redis ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: flutter-platform-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - flutter-platform
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─── MinIO ─────────────────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: flutter-platform-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console
+    volumes:
+      - minio_data:/data
+    networks:
+      - flutter-platform
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── ASP.NET Core API ──────────────────────────────────────────────────────
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: flutter-platform-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=FlutterPlatformDb;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;"
+      ConnectionStrings__Redis: "redis:6379"
+      Jwt__Key: "production-super-secret-jwt-key-change-this-in-prod!!"
+      Jwt__Issuer: "flutter-platform"
+      Jwt__Audience: "flutter-platform-clients"
+      MinIO__Endpoint: "minio:9000"
+      MinIO__AccessKey: "minioadmin"
+      MinIO__SecretKey: "minioadmin"
+      MinIO__UseSSL: "false"
+      MinIO__BucketName: "flutter-platform"
+      MinIO__PublicEndpoint: "http://localhost:9000"
+      Cors__Origins: "http://localhost:5173,http://localhost:3000,http://web:3000"
+    ports:
+      - "8080:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - flutter-platform
+    volumes:
+      - api_logs:/app/logs
+
+  # ─── Build Worker ──────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: ../build-worker
+      dockerfile: Dockerfile
+    container_name: flutter-platform-worker
+    environment:
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=FlutterPlatformDb;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;"
+      ConnectionStrings__Redis: "redis:6379"
+      MinIO__Endpoint: "minio:9000"
+      MinIO__AccessKey: "minioadmin"
+      MinIO__SecretKey: "minioadmin"
+      MinIO__UseSSL: "false"
+      MinIO__BucketName: "flutter-platform"
+      MinIO__PublicEndpoint: "http://minio:9000"
+      Flutter__SdkPath: "/flutter/bin/flutter"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - flutter-platform
+    volumes:
+      - /tmp/flutter-builds:/tmp/flutter-builds
+      - signing_secrets:/secrets:ro
+      - worker_logs:/app/logs
+    deploy:
+      replicas: 1   # Scale up: docker compose up --scale worker=4
+
+  # ─── Web Dashboard ─────────────────────────────────────────────────────────
+  web:
+    build:
+      context: ../web-dashboard
+      dockerfile: Dockerfile
+    container_name: flutter-platform-web
+    environment:
+      VITE_API_URL: "http://localhost:8080"
+      VITE_SIGNALR_URL: "http://localhost:8080"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - flutter-platform
+
+networks:
+  flutter-platform:
+    driver: bridge
+
+volumes:
+  sqlserver_data:
+  redis_data:
+  minio_data:
+  api_logs:
+  worker_logs:
+  signing_secrets:

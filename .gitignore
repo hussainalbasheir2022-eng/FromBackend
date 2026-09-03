@@ -1,0 +1,58 @@
+# Build outputs
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+*.cache
+
+# .NET
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+project.lock.json
+artifacts/
+
+# Logs
+logs/
+*.log
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+**/ios/Flutter/.last_build_id
+app.*.symbols
+app.*.map.json
+
+# Android / APK artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+*.jks
+*.keystore
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+secrets/
+**/signing_secrets/
+
+# IDE / OS
+.vs/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp

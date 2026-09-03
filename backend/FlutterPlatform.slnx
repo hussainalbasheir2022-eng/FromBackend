@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/API/">
+    <Project Path="src/API/FlutterPlatform.API/FlutterPlatform.API.csproj" />
+  </Folder>
+  <Folder Name="/src/Application/">
+    <Project Path="src/Application/FlutterPlatform.Application/FlutterPlatform.Application.csproj" />
+  </Folder>
+  <Folder Name="/src/Domain/">
+    <Project Path="src/Domain/FlutterPlatform.Domain/FlutterPlatform.Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/Infrastructure/">
+    <Project Path="src/Infrastructure/FlutterPlatform.Infrastructure/FlutterPlatform.Infrastructure.csproj" />
+  </Folder>
+</Solution>
